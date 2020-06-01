@@ -16,6 +16,7 @@
 
 <script>
 import API from "@aws-amplify/api";
+import { Auth } from "@aws-amplify/auth";
 import { createTodo } from "./graphql/mutations";
 import { listTodos } from "./graphql/queries";
 import { onCreateTodo } from "./graphql/subscriptions";
@@ -25,18 +26,26 @@ export default {
   data() {
     return {
       name: "",
-      description: ""
+      description: "",
+      todos: [],
+      user: {}
     };
   },
-  created() {
-    this.getTodos();
+  async created() {
+    await this.getUserInfo();
+    this.getTodos(this.user.id);
     this.subscribe();
   },
   methods: {
     async createTodo() {
-      const { name, description } = this;
+      const {
+        name,
+        description,
+        user: { id: userId }
+      } = this;
       if (!name || !description) return;
-      const todo = { name, description };
+      console.log("DID i get it", userId);
+      const todo = { name, description, userId };
       await API.graphql({
         query: createTodo,
         variables: { input: todo }
@@ -44,15 +53,25 @@ export default {
       this.name = "";
       this.description = "";
     },
-    async getTodos() {
+    async getTodos(userId) {
+      console.log("getTODOs", userId);
       const todos = await API.graphql({
-        query: listTodos
+        query: listTodos,
+        variables: { filter: `userId: ${userId}` }
       });
+      console.log("todos", todos);
       this.todos = todos.data.listTodos.items;
+    },
+    async getUserInfo() {
+      console.log("USER Enter");
+      const user = await Auth.currentUserInfo();
+      console.log("USER After", user);
+      this.user = user;
     },
     subscribe() {
       API.graphql({ query: onCreateTodo }).subscribe({
         next: eventData => {
+          console.log("EVENT DATA", eventData);
           let todo = eventData.value.data.onCreateTodo;
           if (this.todos.some(item => item.name === todo.name)) return;
           this.todos = [...this.todos, todo];
