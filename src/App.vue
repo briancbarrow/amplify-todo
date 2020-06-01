@@ -15,7 +15,7 @@
 </template>
 
 <script>
-import API from "@aws-amplify/api";
+import API, { graphqlOperation } from "@aws-amplify/api";
 import { Auth } from "@aws-amplify/auth";
 import { createTodo } from "./graphql/mutations";
 import { listTodos } from "./graphql/queries";
@@ -31,9 +31,12 @@ export default {
       user: {}
     };
   },
-  async created() {
-    await this.getUserInfo();
-    this.getTodos(this.user.id);
+  // created() {
+  //   this.getUserInfo();
+  // },
+  mounted() {
+    // console.log("this user id", this.user.id);
+    this.getTodos();
     this.subscribe();
   },
   methods: {
@@ -53,12 +56,13 @@ export default {
       this.name = "";
       this.description = "";
     },
-    async getTodos(userId) {
-      console.log("getTODOs", userId);
-      const todos = await API.graphql({
-        query: listTodos,
-        variables: { filter: `userId: ${userId}` }
-      });
+    async getTodos() {
+      await this.getUserInfo();
+      const filter = { userId: { eq: this.user.id } };
+      console.log("GET TODOS USER", filter);
+      const todos = await API.graphql(
+        graphqlOperation(listTodos, { filter: filter })
+      );
       console.log("todos", todos);
       this.todos = todos.data.listTodos.items;
     },
@@ -67,6 +71,7 @@ export default {
       const user = await Auth.currentUserInfo();
       console.log("USER After", user);
       this.user = user;
+      return user;
     },
     subscribe() {
       API.graphql({ query: onCreateTodo }).subscribe({
